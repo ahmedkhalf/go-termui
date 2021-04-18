@@ -35,6 +35,13 @@ func (a *Application) ExitFullScreen() {
 	a.ti.Fprintf(a.output, terminfo.ExitCaMode)
 }
 
+func (a *Application) Goto(y, x int) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+
+	a.ti.Fprintf(a.output, terminfo.CursorAddress, y, x)
+}
+
 func (a *Application) Start() {
 	// First we set enable cbreak and noecho, this helps us get user input
 	// as the user types and doesn't show the input to screen.
@@ -96,6 +103,10 @@ func main() {
 	app := NewApplication()
 
 	app.EnterFullScreen()
+
+	app.Goto(1, 3)
+	fmt.Fprint(app.output, "Test")
+
 	defer app.ExitFullScreen()
 
 	app.Start()
