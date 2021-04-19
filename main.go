@@ -55,14 +55,16 @@ func (a *Application) Start() {
 	current.SetRaw()
 	current.DisableEcho()
 
-	resizeSignal := make(chan os.Signal, 1)
-	signal.Notify(resizeSignal, syscall.SIGWINCH)
-
+	// Handle Resize
 	go func() {
-		<-resizeSignal
-		size, _ := current.Size()
-		a.Width = size.Width
-		a.Height = size.Height
+		resizeSignal := make(chan os.Signal, 1)
+		signal.Notify(resizeSignal, syscall.SIGWINCH)
+		for {
+			<-resizeSignal
+			size, _ := current.Size()
+			a.Width = size.Width
+			a.Height = size.Height
+		}
 	}()
 
 	// Input Loop
