@@ -5,20 +5,25 @@ import (
 	"io"
 	"log"
 	"os"
+	"os/signal"
 	"sync"
+	"syscall"
 	"unicode/utf8"
 
-	"github.com/xo/terminfo"
 	"github.com/containerd/console"
+	"github.com/xo/terminfo"
 )
 
 type Application struct {
-	ti     *terminfo.Terminfo
+	ti *terminfo.Terminfo
 
-	mu     *sync.Mutex
+	mu *sync.Mutex
 
 	input  io.Reader
 	output io.Writer
+
+	Width  uint16
+	Height uint16
 }
 
 func (a *Application) EnterFullScreen() {
@@ -50,6 +55,17 @@ func (a *Application) Start() {
 	current.SetRaw()
 	current.DisableEcho()
 
+	resizeSignal := make(chan os.Signal, 1)
+	signal.Notify(resizeSignal, syscall.SIGWINCH)
+
+	go func() {
+		<-resizeSignal
+		size, _ := current.Size()
+		a.Width = size.Width
+		a.Height = size.Height
+	}()
+
+	// Input Loop
 	for {
 		r := readInput(a.input)
 		if r == 'q' {
@@ -66,7 +82,7 @@ func NewApplication() *Application {
 
 	a := &Application{
 		ti:     ti,
-		mu:    &sync.Mutex{},
+		mu:     &sync.Mutex{},
 		input:  os.Stdin,
 		output: os.Stdout,
 	}
