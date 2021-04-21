@@ -65,6 +65,20 @@ func (s *Screen) ExitMarginMode() {
 	s.ti.Fprintf(s.output, terminfo.ExitAmMode)
 }
 
+func (s *Screen) CursorVisible() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	s.ti.Fprintf(s.output, terminfo.CursorVisible)
+}
+
+func (s *Screen) CursorInvisible() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	s.ti.Fprintf(s.output, terminfo.CursorInvisible)
+}
+
 func (s *Screen) Goto(y, x int) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
