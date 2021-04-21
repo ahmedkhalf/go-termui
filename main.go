@@ -1,4 +1,4 @@
-package main
+package termui
 
 import (
 	"fmt"
@@ -144,28 +144,4 @@ func readInput(input io.Reader) rune {
 		return runes[0]
 	}
 	return ' '
-}
-
-func main() {
-	scr := NewScreen()
-
-	scr.EnterFullScreen()
-
-	scr.Goto(1, 3)
-	fmt.Fprint(scr.output, "Test")
-
-	defer scr.ExitFullScreen()
-
-	scr.Start()
-	defer scr.End()
-
-mainloop:
-	for {
-		switch ev := scr.GetEvent().(type) {
-		case KeyEvent:
-			if ev.r == 'q' {
-				break mainloop
-			}
-		}
-	}
 }
