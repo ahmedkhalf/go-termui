@@ -51,6 +51,20 @@ func (s *Screen) ExitFullScreen() {
 	s.ti.Fprintf(s.output, terminfo.ExitCaMode)
 }
 
+func (s *Screen) EnterMarginMode() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	s.ti.Fprintf(s.output, terminfo.EnterAmMode)
+}
+
+func (s *Screen) ExitMarginMode() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	s.ti.Fprintf(s.output, terminfo.ExitAmMode)
+}
+
 func (s *Screen) Goto(y, x int) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
