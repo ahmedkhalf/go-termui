@@ -14,16 +14,27 @@ import (
 	"github.com/xo/terminfo"
 )
 
+type Event interface{}
+
+type ResizeEvent struct {
+	Width  uint16
+	Height uint16
+}
+
+type KeyEvent struct {
+	r rune
+}
+
 type Application struct {
-	ti *terminfo.Terminfo
+	ti      *terminfo.Terminfo
+	Console console.Console
 
 	mu *sync.Mutex
 
 	input  io.Reader
 	output io.Writer
 
-	Width  uint16
-	Height uint16
+	events chan Event
 }
 
 func (a *Application) EnterFullScreen() {
@@ -48,31 +59,49 @@ func (a *Application) Goto(y, x int) {
 }
 
 func (a *Application) Start() {
-	// First we set enable cbreak and noecho, this helps us get user input
+	// First we set enable raw mode and noecho, this helps us get user input
 	// as the user types and doesn't show the input to screen.
-	current := console.Current()
-	defer current.Reset()
-	current.SetRaw()
-	current.DisableEcho()
+	a.Console = console.Current()
+	a.Console.SetRaw()
+	a.Console.DisableEcho()
 
-	// Handle Resize
+	a.events = make(chan Event)
+
+	// Resize Loop
 	go func() {
+		// Initial Size
+		size, _ := a.Console.Size()
+		a.events <- ResizeEvent{Width: size.Width, Height: size.Height}
+
+		// Resize
 		resizeSignal := make(chan os.Signal, 1)
 		signal.Notify(resizeSignal, syscall.SIGWINCH)
 		for {
 			<-resizeSignal
-			size, _ := current.Size()
-			a.Width = size.Width
-			a.Height = size.Height
+			size, _ := a.Console.Size()
+			a.events <- ResizeEvent{Width: size.Width, Height: size.Height}
 		}
 	}()
 
 	// Input Loop
-	for {
-		r := readInput(a.input)
-		if r == 'q' {
-			break
+	go func() {
+		for {
+			r := readInput(a.input)
+			a.events <- KeyEvent{r}
 		}
+	}()
+}
+
+func (a *Application) GetEvent() Event {
+	select {
+	case ev := <-a.events:
+		return ev
+	}
+}
+
+func (a *Application) End() {
+	if a.Console != nil {
+		a.Console.Reset()
 	}
 }
 
@@ -128,4 +157,15 @@ func main() {
 	defer app.ExitFullScreen()
 
 	app.Start()
+	defer app.End()
+
+mainloop:
+	for {
+		switch ev := app.GetEvent().(type) {
+		case KeyEvent:
+			if ev.r == 'q' {
+				break mainloop
+			}
+		}
+	}
 }
