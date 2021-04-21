@@ -25,7 +25,7 @@ type KeyEvent struct {
 	r rune
 }
 
-type Application struct {
+type Screen struct {
 	ti      *terminfo.Terminfo
 	Console console.Console
 
@@ -37,88 +37,88 @@ type Application struct {
 	events chan Event
 }
 
-func (a *Application) EnterFullScreen() {
-	a.mu.Lock()
-	defer a.mu.Unlock()
+func (s *Screen) EnterFullScreen() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 
-	a.ti.Fprintf(a.output, terminfo.EnterCaMode)
+	s.ti.Fprintf(s.output, terminfo.EnterCaMode)
 }
 
-func (a *Application) ExitFullScreen() {
-	a.mu.Lock()
-	defer a.mu.Unlock()
+func (s *Screen) ExitFullScreen() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 
-	a.ti.Fprintf(a.output, terminfo.ExitCaMode)
+	s.ti.Fprintf(s.output, terminfo.ExitCaMode)
 }
 
-func (a *Application) Goto(y, x int) {
-	a.mu.Lock()
-	defer a.mu.Unlock()
+func (s *Screen) Goto(y, x int) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 
-	a.ti.Fprintf(a.output, terminfo.CursorAddress, y, x)
+	s.ti.Fprintf(s.output, terminfo.CursorAddress, y, x)
 }
 
-func (a *Application) Start() {
+func (s *Screen) Start() {
 	// First we set enable raw mode and noecho, this helps us get user input
 	// as the user types and doesn't show the input to screen.
-	a.Console = console.Current()
-	a.Console.SetRaw()
-	a.Console.DisableEcho()
+	s.Console = console.Current()
+	s.Console.SetRaw()
+	s.Console.DisableEcho()
 
-	a.events = make(chan Event)
+	s.events = make(chan Event)
 
 	// Resize Loop
 	go func() {
 		// Initial Size
-		size, _ := a.Console.Size()
-		a.events <- ResizeEvent{Width: size.Width, Height: size.Height}
+		size, _ := s.Console.Size()
+		s.events <- ResizeEvent{Width: size.Width, Height: size.Height}
 
 		// Resize
 		resizeSignal := make(chan os.Signal, 1)
 		signal.Notify(resizeSignal, syscall.SIGWINCH)
 		for {
 			<-resizeSignal
-			size, _ := a.Console.Size()
-			a.events <- ResizeEvent{Width: size.Width, Height: size.Height}
+			size, _ := s.Console.Size()
+			s.events <- ResizeEvent{Width: size.Width, Height: size.Height}
 		}
 	}()
 
 	// Input Loop
 	go func() {
 		for {
-			r := readInput(a.input)
-			a.events <- KeyEvent{r}
+			r := readInput(s.input)
+			s.events <- KeyEvent{r}
 		}
 	}()
 }
 
-func (a *Application) GetEvent() Event {
+func (s *Screen) GetEvent() Event {
 	select {
-	case ev := <-a.events:
+	case ev := <-s.events:
 		return ev
 	}
 }
 
-func (a *Application) End() {
-	if a.Console != nil {
-		a.Console.Reset()
+func (s *Screen) End() {
+	if s.Console != nil {
+		s.Console.Reset()
 	}
 }
 
-func NewApplication() *Application {
+func NewScreen() *Screen {
 	ti, err := terminfo.LoadFromEnv()
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	a := &Application{
+	s := &Screen{
 		ti:     ti,
 		mu:     &sync.Mutex{},
 		input:  os.Stdin,
 		output: os.Stdout,
 	}
 
-	return a
+	return s
 }
 
 func readInput(input io.Reader) rune {
@@ -147,21 +147,21 @@ func readInput(input io.Reader) rune {
 }
 
 func main() {
-	app := NewApplication()
+	scr := NewScreen()
 
-	app.EnterFullScreen()
+	scr.EnterFullScreen()
 
-	app.Goto(1, 3)
-	fmt.Fprint(app.output, "Test")
+	scr.Goto(1, 3)
+	fmt.Fprint(scr.output, "Test")
 
-	defer app.ExitFullScreen()
+	defer scr.ExitFullScreen()
 
-	app.Start()
-	defer app.End()
+	scr.Start()
+	defer scr.End()
 
 mainloop:
 	for {
-		switch ev := app.GetEvent().(type) {
+		switch ev := scr.GetEvent().(type) {
 		case KeyEvent:
 			if ev.r == 'q' {
 				break mainloop
